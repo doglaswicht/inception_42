@@ -6,6 +6,8 @@ RUN apt update && apt upgrade -y &&\
 
 COPY tools/setup_mariadb.sh /setup_mariadb.sh
 
+COPY conf/50-server.cnf /etc/mysql/mariadb.conf.d/50-server.cnf
+
 RUN chmod +x /setup_mariadb.sh
 
 EXPOSE 3306

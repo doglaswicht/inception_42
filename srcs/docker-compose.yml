@@ -11,6 +11,19 @@ services:
       - inception
     volumes:
       - mariadb_data:/var/lib/mysql
+
+  wordpress:
+    container_name: wordpress
+    build: ./requirements/wordpress
+    image: wordpress
+    env_file: .env
+    restart: always
+    depends_on:
+      - mariadb
+    networks:
+      - inception
+    volumes:
+      - wordpress_data:/var/www/html
       
 networks:
   inception:
