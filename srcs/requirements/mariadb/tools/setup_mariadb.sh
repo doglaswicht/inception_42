@@ -1,24 +1,30 @@
 #!/bin/bash
+set -e
 
-service mariadb start
+if [ ! -d "/var/lib/mysql/mysql" ]; then
+    echo "Initializing MariaDB data directory..."
+    mariadb-install-db --user=mysql --datadir=/var/lib/mysql
 
-sleep 2
+    mysqld_safe --skip-networking &
+    pid="$!"
 
-mysql -u root << EOF
+    echo "Waiting for MariaDB to start..."
+    while ! mysqladmin ping --silent; do
+        sleep 1
+    done
 
-CREATE DATABASE IF NOT EXISTS ${MYSQL_DATABASE};
-
+    echo "Creating database and users..."
+    mysql -u root <<EOF
+CREATE DATABASE IF NOT EXISTS \`${MYSQL_DATABASE}\`;
 CREATE USER IF NOT EXISTS '${MYSQL_USER}'@'%' IDENTIFIED BY '${MYSQL_PASSWORD}';
-
-GRANT ALL PRIVILEGES ON ${MYSQL_DATABASE}.* TO '${MYSQL_USER}'@'%';
-
+GRANT ALL PRIVILEGES ON \`${MYSQL_DATABASE}\`.* TO '${MYSQL_USER}'@'%';
 ALTER USER 'root'@'localhost' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}';
-
 FLUSH PRIVILEGES;
-
 EOF
 
-service mariadb stop
+    mysqladmin -u root -p"${MYSQL_ROOT_PASSWORD}" shutdown
+    wait "$pid"
+fi
 
-# Executa o MariaDB em foreground (OBRIGATÓRIO)
+echo "Starting MariaDB in foreground..."
 exec mysqld_safe
