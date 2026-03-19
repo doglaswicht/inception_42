@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   mariadb:
     container_name: mariadb
@@ -11,7 +9,35 @@ services:
       - inception
     volumes:
       - mariadb_data:/var/lib/mysql
-      
+
+  wordpress:
+    container_name: wordpress
+    build: ./requirements/wordpress
+    image: wordpress
+    env_file: .env
+    restart: always
+    depends_on:
+      - mariadb
+    networks:
+      - inception
+    volumes:
+      - wordpress_data:/var/www/html
+
+  nginx:
+    container_name: nginx
+    build: ./requirements/nginx
+    image: nginx
+    env_file: .env
+    restart: always
+    depends_on:
+      - wordpress
+    networks:
+      - inception
+    ports:
+      - "443:443"
+    volumes:
+      - wordpress_data:/var/www/html
+
 networks:
   inception:
     driver: bridge
