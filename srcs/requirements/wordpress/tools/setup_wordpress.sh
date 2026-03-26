@@ -1,50 +1,47 @@
 #!/bin/bash
 set -e
 
-# Espera o MariaDB estar pronto
+DB_PASSWORD=$(cat /run/secrets/db_password)
+WP_ADMIN_PASSWORD=$(cat /run/secrets/wp_admin_password)
+WP_USER_PASSWORD=$(cat /run/secrets/wp_user_password)
+
 echo "Waiting for MariaDB..."
 while ! mysqladmin ping -h"mariadb" --silent; do
     sleep 1
 done
 
-# Caminho do wordpress
 cd /var/www/html
 
-# Baixar wordpress se não existir
 if [ ! -f /var/www/html/wp-config.php ]; then
     echo "Downloading WordPress..."
     wp core download --allow-root
 
     echo "Creating wp-config..."
     wp config create \
-        --dbname=$MYSQL_DATABASE \
-        --dbuser=$MYSQL_USER \
-        --dbpass=$MYSQL_PASSWORD \
-        --dbhost=mariadb \
+        --dbname="${MYSQL_DATABASE}" \
+        --dbuser="${MYSQL_USER}" \
+        --dbpass="${DB_PASSWORD}" \
+        --dbhost="mariadb:3306" \
         --allow-root
 
     echo "Installing WordPress..."
     wp core install \
-        --url=$DOMAIN_NAME \
-        --title=$WP_TITLE \
-        --admin_user=$WP_ADMIN_USER \
-        --admin_password=$WP_ADMIN_PASSWORD \
-        --admin_email=$WP_ADMIN_EMAIL \
-        --skip-email \
+        --url="https://${DOMAIN_NAME}" \
+        --title="${WP_TITLE}" \
+        --admin_user="${WP_ADMIN_USER}" \
+        --admin_password="${WP_ADMIN_PASSWORD}" \
+        --admin_email="${WP_ADMIN_EMAIL}" \
         --allow-root
 
     echo "Creating additional user..."
-    wp user create \
-        $WP_USER $WP_USER_EMAIL \
-        --user_pass=$WP_USER_PASSWORD \
+    wp user create "${WP_USER}" "${WP_USER_EMAIL}" \
+        --user_pass="${WP_USER_PASSWORD}" \
         --role=author \
         --allow-root
 fi
 
-# Configurar PHP-FPM para rodar em foreground
 mkdir -p /run/php
 
 echo "Starting PHP-FPM..."
-# Mudar a porta 127.0.0.0:9000 para 0.0.0.0:9000
-sed -i 's/listen = .*/listen = 9000/' /etc/php/7.4/fpm/pool.d/www.conf
+sed -i 's|^listen = .*|listen = 9000|' /etc/php/7.4/fpm/pool.d/www.conf
 exec php-fpm7.4 -F

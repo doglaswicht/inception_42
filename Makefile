@@ -1,26 +1,31 @@
-NAME = inception
-COMPOSE = docker compose -f srcs/docker-compose.yml
+NAME        = inception
+COMPOSE     = docker compose
+COMPOSE_FILE= srcs/docker-compose.yml
+DATA_PATH   = /home/$(USER)/data
+WP_DATA     = $(DATA_PATH)/wordpress
+DB_DATA     = $(DATA_PATH)/mariadb
 
 all: up
 
-up:
-	$(COMPOSE) up --build -d
+init:
+	@mkdir -p $(WP_DATA)
+	@mkdir -p $(DB_DATA)
+
+up: init
+	@$(COMPOSE) -f $(COMPOSE_FILE) up -d --build
 
 down:
-	$(COMPOSE) down
-
-clean:
-	$(COMPOSE) down -v
-
-fclean: clean
-	docker system prune -af
-
-re: fclean all
+	@$(COMPOSE) -f $(COMPOSE_FILE) down
 
 logs:
-	$(COMPOSE) logs -f
+	@$(COMPOSE) -f $(COMPOSE_FILE) logs
 
-ps:
-	$(COMPOSE) ps
+clean:
+	@$(COMPOSE) -f $(COMPOSE_FILE) down -v
 
-.PHONY: all up down clean fclean re logs ps
+fclean: clean
+	@sudo rm -rf $(WP_DATA) $(DB_DATA)
+
+re: fclean up
+
+.PHONY: all init up down logs clean fclean re
