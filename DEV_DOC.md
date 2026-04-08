@@ -1,3 +1,5 @@
+*This project has been created as part of the 42 curriculum by dleite-b*
+
 # DEV_DOC
 
 ## 1. Environment Setup From Scratch
