@@ -1,14 +1,13 @@
 #!/bin/bash
 set -e
 
-echo "MariaDB setup script starting..."
+DB_PASSWORD=$(cat /run/secrets/db_password)
+DB_ROOT_PASSWORD=$(cat /run/secrets/db_root_password)
 
-echo "MYSQL_DATABASE=$MYSQL_DATABASE"
-echo "MYSQL_USER=$MYSQL_USER"
-echo "MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD"
+echo "Starting MariaDB setup..."
 
 if [ ! -d "/var/lib/mysql/mysql" ]; then
-    echo "Initializing MariaDB data directory..."
+    echo "Initializing database files..."
     mariadb-install-db --user=mysql --datadir=/var/lib/mysql
 fi
 
@@ -16,33 +15,28 @@ echo "Starting temporary MariaDB..."
 mysqld_safe --skip-networking &
 pid="$!"
 
-echo "Waiting for temporary MariaDB..."
+echo "Waiting for MariaDB to be ready..."
 until mysqladmin ping --silent; do
     sleep 1
 done
 
-USER_EXISTS=$(mysql -u root -sse "SELECT EXISTS(SELECT 1 FROM mysql.user WHERE user='${MYSQL_USER}' AND host='%');")
+echo "Setting root password if needed..."
+mysql -u root -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '${DB_ROOT_PASSWORD}';" || true
 
-if [ "$USER_EXISTS" = "0" ]; then
-    echo "Creating database and user..."
-    mysql -u root <<EOF
-CREATE DATABASE IF NOT EXISTS \`${MYSQL_DATABASE}\`;
-CREATE USER IF NOT EXISTS '${MYSQL_USER}'@'%' IDENTIFIED BY '${MYSQL_PASSWORD}';
-GRANT ALL PRIVILEGES ON \`${MYSQL_DATABASE}\`.* TO '${MYSQL_USER}'@'%';
-FLUSH PRIVILEGES;
-EOF
-else
-    echo "User already exists, skipping creation."
-fi
+echo "Creating WordPress database if needed..."
+mysql -u root -p"${DB_ROOT_PASSWORD}" -e "CREATE DATABASE IF NOT EXISTS \`${MYSQL_DATABASE}\`;"
 
-echo "Setting root password..."
-mysql -u root <<EOF
-ALTER USER 'root'@'localhost' IDENTIFIED BY '${MYSQL_ROOT_PASSWORD}';
-FLUSH PRIVILEGES;
-EOF
+echo "Creating WordPress user if needed..."
+mysql -u root -p"${DB_ROOT_PASSWORD}" -e "CREATE USER IF NOT EXISTS '${MYSQL_USER}'@'%' IDENTIFIED BY '${DB_PASSWORD}';"
+
+echo "Granting privileges..."
+mysql -u root -p"${DB_ROOT_PASSWORD}" -e "GRANT ALL PRIVILEGES ON \`${MYSQL_DATABASE}\`.* TO '${MYSQL_USER}'@'%';"
+
+echo "Flushing privileges..."
+mysql -u root -p"${DB_ROOT_PASSWORD}" -e "FLUSH PRIVILEGES;"
 
 echo "Stopping temporary MariaDB..."
-mysqladmin -u root -p"${MYSQL_ROOT_PASSWORD}" shutdown
+mysqladmin -u root -p"${DB_ROOT_PASSWORD}" shutdown
 wait "$pid"
 
 echo "Starting MariaDB in foreground..."
